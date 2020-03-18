@@ -172,7 +172,7 @@ VAR
 	iFillNumber : INT;
 	i : INT;
 	sTime : STRING;
-	fileTime        : T_FILETIME;
+	fileTime : T_FILETIME;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF udiBufferCounter < cMaxBufferRange

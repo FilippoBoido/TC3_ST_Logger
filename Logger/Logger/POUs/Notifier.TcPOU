@@ -69,19 +69,6 @@ fbFileClose(
 	nErrId=> );
 	
 fbRepeatTimer(IN:= , PT:= T#2S, Q=> , ET=> );
-//fbTime();
-
-IF NOT bInit
-THEN
-	bInit := TRUE;
-	(*
-	FOR i := 1 TO cMaxBufferRange DO
-		aEmptyBuffer[i] := '';
-		aBuffer[i] := '';
-		aWorkBuffer[i] := '';
-	END_FOR
-	*)
-END_IF
 
 IF 			bExecute
 	AND  	diStep = 0
@@ -110,6 +97,7 @@ CASE diStep OF
 		
 		IF udiBufferCounter > 0
 		THEN
+		
 			udiWorkCounter := udiBufferCounter-1;
 			udiBufferCounter := 0;
 			
@@ -120,6 +108,7 @@ CASE diStep OF
 			fbFileWrite.bExecute := TRUE;
 			
 			diStep := 40;
+			
 		ELSIF NOT bExecute
 		THEN
 			diStep := 50;
@@ -154,8 +143,7 @@ CASE diStep OF
 		THEN
 			fbFileClose.bExecute := FALSE;
 			IF bExecute 
-			THEN
-				
+			THEN			
 				diStep := 10;
 			ELSE
 				diStep := 0;
@@ -284,11 +272,13 @@ END_IF]]></ST>
       </Implementation>
     </Method>
     <LineIds Name="Notifier">
-      <LineId Id="10" Count="38" />
-      <LineId Id="166" Count="0" />
-      <LineId Id="49" Count="4" />
-      <LineId Id="167" Count="0" />
-      <LineId Id="54" Count="81" />
+      <LineId Id="10" Count="33" />
+      <LineId Id="55" Count="27" />
+      <LineId Id="169" Count="0" />
+      <LineId Id="83" Count="9" />
+      <LineId Id="168" Count="0" />
+      <LineId Id="93" Count="34" />
+      <LineId Id="129" Count="6" />
       <LineId Id="9" Count="0" />
     </LineIds>
     <LineIds Name="Notifier.Write">
