@@ -21,10 +21,7 @@ VAR
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[
-//fbRepeatTimer(IN:= , PT:= T#5S, Q=> , ET=> );
-
-fbNotifier(bExecute := bExecute);
+      <ST><![CDATA[fbNotifier(bExecute := bExecute);
 fbNotifierEvent(
 	CLK:= bMotorError,  
 	fbNotifier:= fbNotifier, 
@@ -35,9 +32,6 @@ fbNotifierEvent(
 	]]></ST>
     </Implementation>
     <LineIds Name="MAIN">
-      <LineId Id="144" Count="0" />
-      <LineId Id="84" Count="0" />
-      <LineId Id="246" Count="0" />
       <LineId Id="242" Count="0" />
       <LineId Id="235" Count="1" />
       <LineId Id="238" Count="0" />
