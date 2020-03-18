@@ -1,0 +1,277 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.2">
+  <POU Name="Logger" Id="{2299ad2c-33aa-48d7-80de-77920f3a5952}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK Logger
+VAR_INPUT
+	bExecute : BOOL;
+	sPathName : STRING;
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	aBuffer : ARRAY[1..cMaxBufferRange] OF T_MaxString;
+	aWorkBuffer : ARRAY[1..cMaxBufferRange] OF T_MaxString;
+	aEmptyBuffer : ARRAY[1..cMaxBufferRange] OF T_MaxString; 
+	
+	fbFileWrite : FB_FileWrite;
+	udiBufferCounter : UDINT;
+	udiWorkCounter : UDINT;
+	hFile : UINT;	
+	
+	fbFileOpen : FB_FileOpen;
+	fbFilePuts : FB_FilePuts;
+	fbFileClose : FB_FileClose;
+	
+	fbGetSystemTime : GETSYSTEMTIME;
+	fbRepeatTimer : TON;
+	diStep  : DINT;
+	i : UDINT;
+	bFilePutsIdle : BOOL;
+	bExecuteFilePuts : BOOL;
+	bInit : BOOL;
+END_VAR
+VAR CONSTANT
+	cMaxBufferRange : UDINT := 1000;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbFileOpen(
+	sNetId:= , 
+	sPathName:= sPathName,
+	nMode:= FOPEN_MODEAPPEND OR FOPEN_MODETEXT, 
+	ePath:= , 
+	bExecute:=, 
+	tTimeout:= , 
+	bBusy=> , 
+	bError=> , 
+	nErrId=> , 
+	hFile=> hFile);
+
+fbFileWrite(
+	sNetId:= , 
+	hFile:= hFile, 
+	pWriteBuff:= ADR(aWorkBuffer) , 
+	cbWriteLen:= , 
+	bExecute:= , 
+	tTimeout:= , 
+	bBusy=> , 
+	bError=> , 
+	nErrId=> , 
+	cbWrite=> );
+
+fbFileClose(
+	sNetId:= , 
+	hFile:= hFile, 
+	bExecute:= , 
+	tTimeout:= , 
+	bBusy=> , 
+	bError=> , 
+	nErrId=> );
+	
+fbRepeatTimer(IN:= , PT:= T#2S, Q=> , ET=> );
+//fbTime();
+
+IF NOT bInit
+THEN
+	bInit := TRUE;
+	FOR i := 1 TO cMaxBufferRange DO
+		aEmptyBuffer[i] := '';
+		aBuffer[i] := '';
+		aWorkBuffer[i] := '';
+	END_FOR
+END_IF
+
+IF 			bExecute
+	AND  	diStep = 0
+THEN
+	diStep := 10;
+END_IF	
+
+CASE diStep OF
+	
+	10:
+	
+		fbFileOpen.bExecute := TRUE;
+		fbRepeatTimer.IN := TRUE;
+		diStep := 20;
+		
+	20:
+	
+		IF 		NOT fbFileOpen.bBusy
+			AND NOT fbFIleOpen.bError
+		THEN
+			fbFileOpen.bExecute := FALSE;
+			diStep := 30;
+		END_IF
+		
+	30:
+		
+		IF udiBufferCounter > 0
+		THEN
+			udiWorkCounter := udiBufferCounter;
+			udiBufferCounter := 0;
+			
+			aWorkBuffer := aBuffer;
+			aBuffer := aEmptyBuffer;
+			
+			fbFileWrite.cbWriteLen := udiWorkCounter * (SIZEOF(T_MaxString));
+			fbFileWrite.bExecute := TRUE;
+			
+			diStep := 40;
+		ELSIF NOT bExecute
+		THEN
+			diStep := 50;
+		END_IF
+		
+		
+	40:
+		
+		IF NOT fbFileWrite.bBusy
+		THEN
+			
+			fbFileWrite.bExecute := FALSE;
+			IF fbRepeatTimer.Q
+			THEN
+				fbRepeatTImer.IN := FALSE;
+				diStep := 50;
+			ELSE
+				diStep := 30;
+			END_IF
+			
+		END_IF
+		
+	50:
+	
+		fbFileClose.bExecute := TRUE;
+		diStep := 60;
+		
+	60: 
+	
+		IF 		NOT fbFileClose.bBusy
+			AND NOT fbFileClose.bError
+		THEN
+			fbFileClose.bExecute := FALSE;
+			IF bExecute 
+			THEN
+				
+				diStep := 10;
+			ELSE
+				diStep := 0;
+			END_IF
+			
+		END_IF
+	
+END_CASE]]></ST>
+    </Implementation>
+    <Method Name="Write" Id="{39218833-d461-4ffc-9b85-e53207615746}">
+      <Declaration><![CDATA[METHOD Write 
+VAR_INPUT
+	sMessage : T_MaxString;
+END_VAR
+VAR
+	iLen : INT;
+	iFillNumber : INT;
+	i : INT;
+	sTime : STRING;
+	fileTime        : T_FILETIME;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF udiBufferCounter < cMaxBufferRange
+THEN
+
+	udiBufferCounter := udiBufferCounter + 1;
+	
+	fbGetSystemTime(timeLoDW=>fileTime.dwLowDateTime, timeHiDW=>fileTime.dwHighDateTime );
+	sTime :=SYSTEMTIME_TO_STRING( FILETIME_TO_SYSTEMTIME( fileTime ) );
+	
+	aBuffer[udiBufferCounter] := sTime;
+	aBuffer[udiBufferCounter] := CONCAT(aBuffer[udiBufferCounter],': ');
+	aBuffer[udiBufferCounter] := CONCAT(aBuffer[udiBufferCounter],sMessage);
+	
+	iLen := LEN(aBuffer[udiBufferCounter]);
+	iFillNumber := 254-iLen;
+	
+	FOR i := 1 TO iFillNumber DO
+		aBuffer[udiBufferCounter] := CONCAT(aBuffer[udiBufferCounter],' ');
+	END_FOR
+	
+	aBuffer[udiBufferCounter][255] := F_ToAsc('$N');
+	
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="Logger">
+      <LineId Id="14" Count="10" />
+      <LineId Id="180" Count="10" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="150" Count="0" />
+      <LineId Id="36" Count="6" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="60" Count="0" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="240" Count="0" />
+      <LineId Id="261" Count="0" />
+      <LineId Id="75" Count="0" />
+      <LineId Id="203" Count="0" />
+      <LineId Id="205" Count="2" />
+      <LineId Id="210" Count="1" />
+      <LineId Id="208" Count="0" />
+      <LineId Id="204" Count="0" />
+      <LineId Id="209" Count="0" />
+      <LineId Id="61" Count="0" />
+      <LineId Id="63" Count="1" />
+      <LineId Id="66" Count="0" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="68" Count="0" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="77" Count="3" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="81" Count="13" />
+      <LineId Id="142" Count="0" />
+      <LineId Id="161" Count="0" />
+      <LineId Id="168" Count="1" />
+      <LineId Id="166" Count="0" />
+      <LineId Id="163" Count="1" />
+      <LineId Id="200" Count="0" />
+      <LineId Id="158" Count="0" />
+      <LineId Id="145" Count="1" />
+      <LineId Id="247" Count="1" />
+      <LineId Id="257" Count="0" />
+      <LineId Id="143" Count="0" />
+      <LineId Id="95" Count="0" />
+      <LineId Id="97" Count="3" />
+      <LineId Id="102" Count="1" />
+      <LineId Id="201" Count="0" />
+      <LineId Id="193" Count="1" />
+      <LineId Id="196" Count="3" />
+      <LineId Id="195" Count="0" />
+      <LineId Id="104" Count="3" />
+      <LineId Id="128" Count="8" />
+      <LineId Id="252" Count="2" />
+      <LineId Id="241" Count="0" />
+      <LineId Id="177" Count="0" />
+      <LineId Id="255" Count="1" />
+      <LineId Id="174" Count="0" />
+      <LineId Id="251" Count="0" />
+      <LineId Id="138" Count="0" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="70" Count="0" />
+    </LineIds>
+    <LineIds Name="Logger.Write">
+      <LineId Id="5" Count="0" />
+      <LineId Id="10" Count="1" />
+      <LineId Id="7" Count="0" />
+      <LineId Id="33" Count="3" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="39" Count="1" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="24" Count="0" />
+      <LineId Id="26" Count="1" />
+      <LineId Id="30" Count="1" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="8" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

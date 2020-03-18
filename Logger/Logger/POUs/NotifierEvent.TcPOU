@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.2">
+  <POU Name="NotifierEvent" Id="{e22bd0c9-9993-4c66-9376-3ddb1028b9e6}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK NotifierEvent EXTENDS R_TRIG
+VAR_INPUT
+	sModuleName : T_MaxString;
+	sDeviceName : T_MaxString;
+	sStatus: T_MaxString;
+	sMessage : T_MaxString;
+END_VAR
+VAR_IN_OUT
+	fbNotifier : Notifier;
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[SUPER^();
+IF 		Q
+	AND __ISVALIDREF(fbNotifier)
+THEN
+	fbNotifier.Write(
+		sDeviceName := sDeviceName,
+		sMessage := sMessage,
+		sModuleName := sModuleName,
+		sStatus := sStatus);
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="NotifierEvent">
+      <LineId Id="32" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="14" Count="1" />
+      <LineId Id="19" Count="1" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="12" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.2">
+  <POU Name="MAIN" Id="{f62c6827-06de-4e99-83eb-58a9b7fb6cd1}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+	
+	diStep : DINT;
+	bStart : BOOL;
+	bStop : BOOL;
+	fbRepeatTimer : TON;
+	udiCounter : UDINT;
+	
+	fbLogger : Logger:= (sPathName:='C:\Users\fboid\Documents\ScopeTest\Log.txt');
+	fbNotifier : Notifier := (sPathName:='C:\Users\fboid\Documents\ScopeTest\Log.csv');
+	fbNotifierEvent : NotifierEvent;
+	i : INT;
+	bExecute : BOOL;
+	uiCounter : UINT:= 0;
+	bMotorError : BOOL;
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+//fbRepeatTimer(IN:= , PT:= T#5S, Q=> , ET=> );
+
+fbNotifier(bExecute := bExecute);
+fbNotifierEvent(
+	CLK:= bMotorError,  
+	fbNotifier:= fbNotifier, 
+	sModuleName := 'PreHeat',
+	sDeviceName := 'Load conveyor',
+	sStatus := 'Error',
+	sMessage := 'Motor overloaded');
+	]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="144" Count="0" />
+      <LineId Id="84" Count="0" />
+      <LineId Id="246" Count="0" />
+      <LineId Id="242" Count="0" />
+      <LineId Id="235" Count="1" />
+      <LineId Id="238" Count="0" />
+      <LineId Id="243" Count="2" />
+      <LineId Id="226" Count="0" />
+      <LineId Id="234" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

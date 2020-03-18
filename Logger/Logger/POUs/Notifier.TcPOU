@@ -1,0 +1,348 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.2">
+  <POU Name="Notifier" Id="{fffe6088-b66b-4f66-bc0c-b4fb55222d39}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK Notifier
+VAR_INPUT
+	bExecute : BOOL;
+	sPathName : STRING;
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	aBuffer : ARRAY[1..cMaxBufferRange] OF BYTE;
+	aWorkBuffer : ARRAY[1..cMaxBufferRange] OF BYTE;
+	aEmptyBuffer : ARRAY[1..cMaxBufferRange] OF BYTE; 
+	
+	fbFileWrite : FB_FileWrite;
+	udiBufferCounter : UDINT;
+	udiWorkCounter : UDINT;
+	hFile : UINT;	
+	
+	fbFileOpen : FB_FileOpen;
+	fbFilePuts : FB_FilePuts;
+	fbFileClose : FB_FileClose;
+	
+	fbGetSystemTime : GETSYSTEMTIME;
+	fbRepeatTimer : TON;
+	diStep  : DINT;
+	i : UDINT;
+	bFilePutsIdle : BOOL;
+	bExecuteFilePuts : BOOL;
+	bInit : BOOL;
+END_VAR
+VAR CONSTANT
+	cMaxBufferRange : UDINT := 1000 * 256;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbFileOpen(
+	sNetId:= , 
+	sPathName:= sPathName,
+	nMode:= FOPEN_MODEAPPEND OR FOPEN_MODETEXT, 
+	ePath:= , 
+	bExecute:=, 
+	tTimeout:= , 
+	bBusy=> , 
+	bError=> , 
+	nErrId=> , 
+	hFile=> hFile);
+
+fbFileWrite(
+	sNetId:= , 
+	hFile:= hFile, 
+	pWriteBuff:= ADR(aWorkBuffer) , 
+	cbWriteLen:= , 
+	bExecute:= , 
+	tTimeout:= , 
+	bBusy=> , 
+	bError=> , 
+	nErrId=> , 
+	cbWrite=> );
+
+fbFileClose(
+	sNetId:= , 
+	hFile:= hFile, 
+	bExecute:= , 
+	tTimeout:= , 
+	bBusy=> , 
+	bError=> , 
+	nErrId=> );
+	
+fbRepeatTimer(IN:= , PT:= T#2S, Q=> , ET=> );
+//fbTime();
+
+IF NOT bInit
+THEN
+	bInit := TRUE;
+	(*
+	FOR i := 1 TO cMaxBufferRange DO
+		aEmptyBuffer[i] := '';
+		aBuffer[i] := '';
+		aWorkBuffer[i] := '';
+	END_FOR
+	*)
+END_IF
+
+IF 			bExecute
+	AND  	diStep = 0
+THEN
+	diStep := 10;
+END_IF	
+
+CASE diStep OF
+	
+	10:
+	
+		fbFileOpen.bExecute := TRUE;
+		fbRepeatTimer.IN := TRUE;
+		diStep := 20;
+		
+	20:
+	
+		IF 		NOT fbFileOpen.bBusy
+			AND NOT fbFIleOpen.bError
+		THEN
+			fbFileOpen.bExecute := FALSE;
+			diStep := 30;
+		END_IF
+		
+	30:
+		
+		IF udiBufferCounter > 0
+		THEN
+			udiWorkCounter := udiBufferCounter-1;
+			udiBufferCounter := 0;
+			
+			aWorkBuffer := aBuffer;
+			aBuffer := aEmptyBuffer;
+			
+			fbFileWrite.cbWriteLen := udiWorkCounter;
+			fbFileWrite.bExecute := TRUE;
+			
+			diStep := 40;
+		ELSIF NOT bExecute
+		THEN
+			diStep := 50;
+		END_IF
+		
+		
+	40:
+		
+		IF NOT fbFileWrite.bBusy
+		THEN
+			
+			fbFileWrite.bExecute := FALSE;
+			IF fbRepeatTimer.Q
+			THEN
+				fbRepeatTImer.IN := FALSE;
+				diStep := 50;
+			ELSE
+				diStep := 30;
+			END_IF
+			
+		END_IF
+		
+	50:
+	
+		fbFileClose.bExecute := TRUE;
+		diStep := 60;
+		
+	60: 
+	
+		IF 		NOT fbFileClose.bBusy
+			AND NOT fbFileClose.bError
+		THEN
+			fbFileClose.bExecute := FALSE;
+			IF bExecute 
+			THEN
+				
+				diStep := 10;
+			ELSE
+				diStep := 0;
+			END_IF
+			
+		END_IF
+	
+END_CASE]]></ST>
+    </Implementation>
+    <Method Name="Write" Id="{b7d41bba-8a2c-4064-aa29-028b5bff3198}">
+      <Declaration><![CDATA[METHOD Write 
+VAR_INPUT
+	
+	sModuleName : T_MaxString;
+	sDeviceName : T_MaxString;
+	sStatus	: T_MaxString;
+	sMessage : T_MaxString;
+	
+END_VAR
+VAR
+	iLen : INT;
+	iFillNumber : INT;
+	i : INT;
+	sTime : STRING;
+	fileTime : T_FILETIME;
+	iTmpSize : INT;
+	aLocalBuffer : ARRAY[0..MAX_STRING_LENGTH] OF BYTE;
+	aEmptyLocalBuffer : ARRAY[0..MAX_STRING_LENGTH] OF BYTE;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF udiBufferCounter < cMaxBufferRange
+THEN
+		
+	fbGetSystemTime(timeLoDW=>fileTime.dwLowDateTime, timeHiDW=>fileTime.dwHighDateTime );
+	sTime :=SYSTEMTIME_TO_STRING( FILETIME_TO_SYSTEMTIME( fileTime ) );
+
+//Insert TimeStamp	
+//----------------------------------------------------------------------------------------------------------------------------	
+	iTmpSize := LEN(sTime);
+	aLocalBuffer := MAXSTRING_TO_BYTEARR(sTime);
+	
+	FOR i:= 0 TO iTmpSize - 1 DO
+		
+		aBuffer[udiBufferCounter] := aLocalBuffer[i] ;	
+		udiBufferCounter := udiBufferCounter + 1;
+		
+	END_FOR
+//----------------------------------------------------------------------------------------------------------------------------
+	
+	aBuffer[udiBufferCounter] := F_ToAsc('$t');
+	udiBufferCounter := udiBufferCounter + 1;
+	
+	aLocalBuffer := aEmptyLocalBuffer;
+
+//Insert ModuleName	
+//----------------------------------------------------------------------------------------------------------------------------	
+	iTmpSize := LEN(sModuleName);
+	aLocalBuffer := MAXSTRING_TO_BYTEARR(sModuleName);
+	
+	FOR i:= 0 TO iTmpSize - 1 DO
+		
+		aBuffer[udiBufferCounter] := aLocalBuffer[i] ;	
+		udiBufferCounter := udiBufferCounter + 1;
+		
+	END_FOR
+//----------------------------------------------------------------------------------------------------------------------------
+	
+	aBuffer[udiBufferCounter] := F_ToAsc('$t');
+	udiBufferCounter := udiBufferCounter + 1;
+	
+	aLocalBuffer := aEmptyLocalBuffer;
+
+//Insert DeviceName
+//----------------------------------------------------------------------------------------------------------------------------
+	iTmpSize := LEN(sDeviceName);
+	aLocalBuffer := MAXSTRING_TO_BYTEARR(sDeviceName);
+	
+	FOR i:= 0 TO iTmpSize - 1 DO
+		
+		aBuffer[udiBufferCounter] := aLocalBuffer[i] ;	
+		udiBufferCounter := udiBufferCounter + 1;
+		
+	END_FOR
+//----------------------------------------------------------------------------------------------------------------------------	
+
+	aBuffer[udiBufferCounter] := F_ToAsc('$t');
+	udiBufferCounter := udiBufferCounter + 1;
+	
+	aLocalBuffer := aEmptyLocalBuffer;
+
+//Insert Status
+//----------------------------------------------------------------------------------------------------------------------------	
+	iTmpSize := LEN(sStatus);
+	aLocalBuffer := MAXSTRING_TO_BYTEARR(sStatus);
+	
+	FOR i:= 0 TO iTmpSize - 1 DO
+		
+		aBuffer[udiBufferCounter] := aLocalBuffer[i] ;	
+		udiBufferCounter := udiBufferCounter + 1;
+		
+	END_FOR
+//----------------------------------------------------------------------------------------------------------------------------
+	
+	aBuffer[udiBufferCounter] := F_ToAsc('$t');
+	udiBufferCounter := udiBufferCounter + 1;
+	
+	aLocalBuffer := aEmptyLocalBuffer;
+
+//Insert Message
+//----------------------------------------------------------------------------------------------------------------------------	
+	iTmpSize := LEN(sMessage);
+	aLocalBuffer := MAXSTRING_TO_BYTEARR(sMessage);
+	
+	FOR i:= 0 TO iTmpSize - 1 DO
+		
+		aBuffer[udiBufferCounter] := aLocalBuffer[i] ;	
+		udiBufferCounter := udiBufferCounter + 1;
+		
+	END_FOR	
+//----------------------------------------------------------------------------------------------------------------------------
+aBuffer[udiBufferCounter] := F_ToAsc('$N');
+udiBufferCounter := udiBufferCounter + 1;	
+	
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="Notifier">
+      <LineId Id="10" Count="38" />
+      <LineId Id="166" Count="0" />
+      <LineId Id="49" Count="4" />
+      <LineId Id="167" Count="0" />
+      <LineId Id="54" Count="81" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="Notifier.Write">
+      <LineId Id="15" Count="1" />
+      <LineId Id="54" Count="0" />
+      <LineId Id="20" Count="1" />
+      <LineId Id="83" Count="0" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="64" Count="0" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="43" Count="0" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="44" Count="1" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="80" Count="0" />
+      <LineId Id="61" Count="1" />
+      <LineId Id="60" Count="0" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="84" Count="0" />
+      <LineId Id="81" Count="0" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="65" Count="7" />
+      <LineId Id="24" Count="0" />
+      <LineId Id="75" Count="0" />
+      <LineId Id="82" Count="0" />
+      <LineId Id="77" Count="1" />
+      <LineId Id="26" Count="0" />
+      <LineId Id="85" Count="1" />
+      <LineId Id="32" Count="1" />
+      <LineId Id="89" Count="7" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="87" Count="0" />
+      <LineId Id="98" Count="3" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="103" Count="0" />
+      <LineId Id="102" Count="0" />
+      <LineId Id="107" Count="7" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="115" Count="0" />
+      <LineId Id="120" Count="0" />
+      <LineId Id="117" Count="2" />
+      <LineId Id="116" Count="0" />
+      <LineId Id="121" Count="10" />
+      <LineId Id="106" Count="0" />
+      <LineId Id="132" Count="0" />
+      <LineId Id="134" Count="0" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
